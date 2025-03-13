@@ -49,13 +49,24 @@ export class WSSManager{
 
   private _onHandshakeMessage(ws: WebSocket, handshakeMessage: HandShakeMessage){
     const localMatchIdx: UniqueSocketConnection | undefined = this._clientList.find((client) => client.id === handshakeMessage.id);
+    let client: UniqueSocketConnection | undefined = undefined
     
-    if ((handshakeMessage.name === '' && handshakeMessage.id === '') || !localMatchIdx) {
+    if (handshakeMessage.name === '' && handshakeMessage.id === '') {
       const newClient: UniqueSocketConnection = this._createNewLocalClient(ws);
       this._sendHandshakeMessage(ws, newClient);
+      client = newClient;
       
     }else{
-      localMatchIdx.socket = ws;
+      if (localMatchIdx){
+        localMatchIdx.socket = ws;
+        client = localMatchIdx;
+      }else{
+        const newClient: UniqueSocketConnection = this._createNewLocalClient(ws, handshakeMessage.id, handshakeMessage.name);
+        this._sendHandshakeMessage(ws, newClient);
+        client = newClient;
+      }
+
+    console.log(`New client connected ${client.name} ${client.id}`);
     }
   }
 
@@ -70,10 +81,10 @@ export class WSSManager{
     }
   }
 
-  private _createNewLocalClient(ws: WebSocket) : UniqueSocketConnection{
+  private _createNewLocalClient(ws: WebSocket, id?: string, name?: string) : UniqueSocketConnection{
     const newClient = { 
-      id: nanoid(), 
-      name: this._generateRandName(), 
+      id: id ? id : nanoid(), 
+      name: name ? name : this._generateRandName(), 
       socket: ws 
     };
 
@@ -96,7 +107,7 @@ export class WSSManager{
     setInterval(() => {
       this._clientList = this._clientList.filter((client) => {
         if (client.socket.readyState === WebSocket.CLOSED) {
-          console.log(`client disconnected ${client.id}`);
+          console.log(`Client disconnected ${client.name} ${client.id}`);
           return false;
         }
         return true;
