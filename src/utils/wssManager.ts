@@ -2,7 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { nanoid } from 'nanoid';
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 
-import { UniqueSocketConnection, ChatMessage, HandShakeMessage, WSMessage } from './types/wssManager.types';
+import { UniqueSocketConnection, ChatMessage, HandShakeMessage, WSMessage } from './wssManager.types';
 
 
 export class WSSManager{
@@ -47,27 +47,36 @@ export class WSSManager{
     });
   }
 
-  private _onHandshakeMessage(ws: WebSocket, handshakeMessage: HandShakeMessage){
-    const localMatchIdx: UniqueSocketConnection | undefined = this._clientList.find((client) => client.id === handshakeMessage.id);
-    let client: UniqueSocketConnection | undefined = undefined
-    
-    if (handshakeMessage.name === '' && handshakeMessage.id === '') {
+  private _onHandshakeMessage(ws: WebSocket, handshakeMessage: HandShakeMessage) {
+    let client: UniqueSocketConnection | undefined;
+  
+    if (handshakeMessage.id === '' && handshakeMessage.name === '') {
+      // Create a new client with a unique ID and name
       const newClient: UniqueSocketConnection = this._createNewLocalClient(ws);
       this._sendHandshakeMessage(ws, newClient);
       client = newClient;
-      
-    }else{
-      if (localMatchIdx){
-        localMatchIdx.socket = ws;
-        client = localMatchIdx;
-      }else{
+    } else {
+      // Check if the client ID already exists
+      const existingClient = this._clientList.find((client) => client.id === handshakeMessage.id);
+  
+      if (existingClient) {
+        if (existingClient.socket !== ws) {
+          console.warn(`Duplicate client ID detected: ${handshakeMessage.id}`);
+          ws.close(); // Reject the connection
+          return;
+        }
+        // Update the existing client's socket
+        existingClient.socket = ws;
+        client = existingClient;
+      } else {
+        // Create a new client with the provided ID and name
         const newClient: UniqueSocketConnection = this._createNewLocalClient(ws, handshakeMessage.id, handshakeMessage.name);
         this._sendHandshakeMessage(ws, newClient);
         client = newClient;
       }
-
-    console.log(`New client connected ${client.name} ${client.id}`);
     }
+  
+    console.log(`New client connected: ${client?.name} (${client?.id})`);
   }
 
   private _onClientMessage(ws: WebSocket, data: string){
